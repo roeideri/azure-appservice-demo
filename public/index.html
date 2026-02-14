@@ -4,37 +4,177 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <script src="https://cdn.tailwindcss.com"></script>
-  <title>Allegro Chat - Anti Espionage</title>
+  <title>Allegro CHAT</title>
+
+  <style>
+    /* Background: deep black + subtle gradient */
+    body {
+      background: radial-gradient(1200px 800px at 30% 20%, rgba(34,197,94,0.08), transparent 55%),
+                  radial-gradient(900px 600px at 70% 40%, rgba(56,189,248,0.06), transparent 50%),
+                  #05070a;
+    }
+
+    /* Scanlines + faint noise */
+    .scanlines::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.03) 0px,
+        rgba(255,255,255,0.03) 1px,
+        rgba(0,0,0,0) 3px,
+        rgba(0,0,0,0) 6px
+      );
+      mix-blend-mode: overlay;
+      opacity: 0.18;
+    }
+    .scanlines::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E");
+      opacity: 0.06;
+      mix-blend-mode: overlay;
+    }
+
+    /* Glitch effect for title */
+    .glitch {
+      position: relative;
+      display: inline-block;
+      text-shadow: 0 0 12px rgba(34,197,94,.35);
+    }
+    .glitch::before, .glitch::after {
+      content: attr(data-text);
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: .75;
+      clip-path: inset(0 0 0 0);
+    }
+    .glitch::before {
+      transform: translate(1px, 0);
+      color: rgba(34,197,94,0.9);
+      animation: glitch1 2.8s infinite linear alternate-reverse;
+    }
+    .glitch::after {
+      transform: translate(-1px, 0);
+      color: rgba(56,189,248,0.75);
+      animation: glitch2 3.4s infinite linear alternate-reverse;
+    }
+    @keyframes glitch1 {
+      0% { clip-path: inset(0 0 92% 0); }
+      10% { clip-path: inset(18% 0 62% 0); }
+      20% { clip-path: inset(62% 0 24% 0); }
+      30% { clip-path: inset(10% 0 72% 0); }
+      40% { clip-path: inset(45% 0 42% 0); }
+      50% { clip-path: inset(80% 0 10% 0); }
+      60% { clip-path: inset(35% 0 55% 0); }
+      70% { clip-path: inset(5% 0 85% 0); }
+      80% { clip-path: inset(55% 0 30% 0); }
+      90% { clip-path: inset(25% 0 60% 0); }
+      100% { clip-path: inset(0 0 92% 0); }
+    }
+    @keyframes glitch2 {
+      0% { clip-path: inset(80% 0 10% 0); }
+      12% { clip-path: inset(30% 0 58% 0); }
+      24% { clip-path: inset(5% 0 85% 0); }
+      36% { clip-path: inset(55% 0 28% 0); }
+      48% { clip-path: inset(15% 0 70% 0); }
+      60% { clip-path: inset(70% 0 15% 0); }
+      72% { clip-path: inset(40% 0 45% 0); }
+      84% { clip-path: inset(18% 0 65% 0); }
+      100% { clip-path: inset(80% 0 10% 0); }
+    }
+
+    /* Neon focus ring */
+    .neon-focus:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(34,197,94,0.35), 0 0 20px rgba(34,197,94,0.18);
+      border-color: rgba(34,197,94,0.55);
+    }
+
+    /* Scrollbar */
+    #messages::-webkit-scrollbar { width: 10px; }
+    #messages::-webkit-scrollbar-thumb {
+      background: rgba(34,197,94,0.22);
+      border: 1px solid rgba(34,197,94,0.22);
+      border-radius: 999px;
+    }
+    #messages::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); }
+  </style>
 </head>
-<body class="bg-slate-950 text-slate-100">
+
+<body class="scanlines text-slate-100">
   <div class="max-w-3xl mx-auto p-4 md:p-6">
     <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold">Allegro Chat - Anti Espionage</h1>
-      <div class="text-xs text-slate-400">Real-time + media upload</div>
+      <div>
+        <div class="text-[10px] tracking-[0.3em] text-green-300/70">SECURE CHANNEL</div>
+        <h1 class="text-2xl md:text-3xl font-extrabold mt-1 glitch" data-text="Allegro Chat">Allegro Chat</h1>
+        <div class="text-xs text-slate-400 mt-1">
+          <span class="text-green-300/80">LIVE</span> • real-time messages • media upload
+        </div>
+      </div>
+
+      <div class="hidden md:block text-right">
+        <div class="text-[10px] text-slate-400">SESSION</div>
+        <div id="sessionTag" class="text-xs font-mono text-green-300/80">anon</div>
+      </div>
     </div>
 
     <!-- Name modal -->
-    <div id="nameModal" class="fixed inset-0 bg-black/60 flex items-center justify-center p-4">
-      <div class="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 p-5">
-        <h2 class="text-lg font-semibold">Choose a name</h2>
-        <p class="text-slate-400 text-sm mt-1">This name shows with your messages.</p>
-        <input id="nameInput" class="mt-4 w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 outline-none" placeholder="e.g. Elias" />
-        <button id="joinBtn" class="mt-3 w-full rounded-xl bg-slate-100 text-slate-900 font-semibold py-2">Join</button>
+    <div id="nameModal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4">
+      <div class="w-full max-w-md rounded-2xl bg-slate-950/70 border border-green-500/20 p-5 shadow-[0_0_40px_rgba(34,197,94,0.12)] backdrop-blur">
+        <div class="text-[10px] tracking-[0.3em] text-green-300/70">IDENTITY</div>
+        <h2 class="text-lg font-semibold mt-1">Choose a handle</h2>
+        <p class="text-slate-400 text-sm mt-1">This name appears next to your messages.</p>
+
+        <input id="nameInput"
+               class="mt-4 w-full rounded-xl bg-black/40 border border-green-500/20 px-3 py-2 font-mono neon-focus"
+               placeholder="e.g. zeroCool" />
+
+        <button id="joinBtn"
+                class="mt-3 w-full rounded-xl bg-green-400/90 text-black font-semibold py-2 hover:bg-green-300 transition shadow-[0_0_20px_rgba(34,197,94,0.18)]">
+          Enter Channel
+        </button>
+
+        <div class="text-[11px] text-slate-500 mt-3 font-mono">
+          Tip: keep it short. No real names if you don’t want.
+        </div>
       </div>
     </div>
 
     <!-- Chat area -->
-    <div class="mt-5 rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden">
+    <div class="mt-5 rounded-2xl bg-slate-950/55 border border-green-500/20 overflow-hidden shadow-[0_0_30px_rgba(34,197,94,0.08)] backdrop-blur">
+      <div class="px-4 py-3 border-b border-green-500/10 flex items-center justify-between">
+        <div class="text-xs font-mono text-slate-300">
+          <span class="text-green-300/80">#</span> main
+        </div>
+        <div class="text-xs text-slate-500 font-mono">24h retention (optional)</div>
+      </div>
+
       <div id="messages" class="h-[55vh] overflow-y-auto p-4 space-y-3"></div>
 
-      <div class="border-t border-slate-800 p-3">
+      <div class="border-t border-green-500/10 p-3">
         <div class="flex gap-2 items-center">
-          <input id="text" class="flex-1 rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 outline-none" placeholder="Type a message..." />
+          <input id="text"
+                 class="flex-1 rounded-xl bg-black/35 border border-green-500/20 px-3 py-2 font-mono neon-focus"
+                 placeholder="> type message..." />
+
           <input id="file" type="file" class="hidden" />
-          <button id="fileBtn" class="rounded-xl px-3 py-2 bg-slate-800 border border-slate-700">📎</button>
-          <button id="send" class="rounded-xl px-4 py-2 bg-slate-100 text-slate-900 font-semibold">Send</button>
+          <button id="fileBtn"
+                  class="rounded-xl px-3 py-2 bg-black/35 border border-green-500/20 hover:border-green-400/40 transition">
+            📎
+          </button>
+
+          <button id="send"
+                  class="rounded-xl px-4 py-2 bg-green-400/90 text-black font-semibold hover:bg-green-300 transition shadow-[0_0_18px_rgba(34,197,94,0.16)]">
+            Send
+          </button>
         </div>
-        <div class="text-xs text-slate-500 mt-2">Max file size: 10MB. Images/videos/audio will preview.</div>
+        <div class="text-xs text-slate-500 mt-2 font-mono">Max file size: 10MB • images/videos/audio preview</div>
       </div>
     </div>
   </div>
@@ -53,9 +193,10 @@
 
     const fileInput = document.getElementById("file");
     const fileBtn = document.getElementById("fileBtn");
+    const sessionTag = document.getElementById("sessionTag");
 
     let myName = "";
-    let historyBuffered = [];   // store history until user chooses name
+    let historyBuffered = [];
     let historyRendered = false;
 
     function nowISO() { return new Date().toISOString(); }
@@ -72,8 +213,8 @@
 
       const bubble = document.createElement("div");
       bubble.className = (mine
-        ? "max-w-[80%] rounded-2xl bg-slate-100 text-slate-900 p-3"
-        : "max-w-[80%] rounded-2xl bg-slate-800 text-slate-100 p-3 border border-slate-700");
+        ? "max-w-[80%] rounded-2xl bg-green-300/90 text-black p-3 shadow-[0_0_18px_rgba(34,197,94,0.10)]"
+        : "max-w-[80%] rounded-2xl bg-black/35 text-slate-100 p-3 border border-green-500/15");
 
       bubble.innerHTML = html;
       wrap.appendChild(bubble);
@@ -84,8 +225,8 @@
     function renderTextMessage(msg) {
       const mine = myName && msg.name === myName;
       addBubble(
-        `<div class="text-xs opacity-70">${escapeHtml(msg.name)} • ${escapeHtml(msg.time)}</div>
-         <div class="mt-1">${escapeHtml(msg.text)}</div>`,
+        `<div class="text-[11px] opacity-80 font-mono">${escapeHtml(msg.name)} • ${escapeHtml(msg.time)}</div>
+         <div class="mt-1 font-mono">${escapeHtml(msg.text)}</div>`,
         mine
       );
     }
@@ -96,19 +237,19 @@
       const safeFileName = escapeHtml(m.fileName);
       const safeMime = escapeHtml(m.mimeType || "");
 
-      let preview = `<a class="underline" href="${safeUrl}" target="_blank">Download: ${safeFileName}</a>`;
+      let preview = `<a class="underline font-mono" href="${safeUrl}" target="_blank">download: ${safeFileName}</a>`;
 
       if (safeMime.startsWith("image/")) {
-        preview = `<img src="${safeUrl}" class="mt-2 rounded-xl max-h-64" />`;
+        preview = `<img src="${safeUrl}" class="mt-2 rounded-xl max-h-64 border border-green-500/20" />`;
       } else if (safeMime.startsWith("video/")) {
-        preview = `<video controls class="mt-2 rounded-xl max-h-64"><source src="${safeUrl}"></video>`;
+        preview = `<video controls class="mt-2 rounded-xl max-h-64 border border-green-500/20"><source src="${safeUrl}"></video>`;
       } else if (safeMime.startsWith("audio/")) {
         preview = `<audio controls class="mt-2 w-full"><source src="${safeUrl}"></audio>`;
       }
 
       addBubble(
-        `<div class="text-xs opacity-70">${escapeHtml(m.name)} • ${escapeHtml(m.time)}</div>
-         <div class="mt-1 text-sm">📎 ${safeFileName}</div>
+        `<div class="text-[11px] opacity-80 font-mono">${escapeHtml(m.name)} • ${escapeHtml(m.time)}</div>
+         <div class="mt-1 text-sm font-mono">📎 ${safeFileName}</div>
          ${preview}`,
         mine
       );
@@ -116,19 +257,14 @@
 
     function renderBufferedHistoryIfReady() {
       if (!myName || historyRendered) return;
-      if (historyBuffered.length === 0) {
-        historyRendered = true;
-        return;
-      }
+      if (historyBuffered.length === 0) { historyRendered = true; return; }
 
-      // add a small divider
-      addBubble(`<div class="text-xs text-slate-600">— Last 24h history —</div>`, false);
+      addBubble(`<div class="text-[11px] text-slate-400 font-mono">— history loaded —</div>`, false);
 
       for (const it of historyBuffered) {
         if (it.kind === "text") renderTextMessage(it);
         else if (it.kind === "file") renderFileMessage(it);
       }
-
       historyRendered = true;
       historyBuffered = [];
     }
@@ -138,10 +274,11 @@
       if (!n) return;
       myName = n;
       nameModal.style.display = "none";
-      addBubble(`<div class="text-sm text-slate-600">You joined as <b>${escapeHtml(myName)}</b></div>`, true);
+      if (sessionTag) sessionTag.textContent = myName;
 
-      // now that we have a name, we can render history and correctly mark "mine"
+      addBubble(`<div class="text-[11px] text-slate-700 font-mono">connected as <b>${escapeHtml(myName)}</b></div>`, true);
       renderBufferedHistoryIfReady();
+      text.focus();
     };
 
     function sendText() {
@@ -167,7 +304,7 @@
       if (!f) return;
 
       if (f.size > 10 * 1024 * 1024) {
-        addBubble(`<div class="text-sm"><b>File too big.</b> Max 10MB.</div>`, true);
+        addBubble(`<div class="text-sm font-mono"><b>file too big.</b> max 10mb.</div>`, true);
         fileInput.value = "";
         return;
       }
@@ -179,57 +316,28 @@
         time: nowISO(),
         fileName: f.name,
         mimeType: f.type,
-        data: Array.from(new Uint8Array(buf)) // send as byte array
+        data: Array.from(new Uint8Array(buf))
       }, (ack) => {
         if (!ack || !ack.ok) {
-          addBubble(`<div class="text-sm"><b>Upload failed.</b></div>`, true);
+          addBubble(`<div class="text-sm font-mono"><b>upload failed.</b></div>`, true);
         }
       });
 
       fileInput.value = "";
     };
 
-    // --- incoming events ---
+    // History (if you implemented it server-side)
     socket.on("chat:history", (items) => {
-      // items come sorted oldest->newest from server
-      // buffer until user chooses name so we can mark "mine" correctly
       historyBuffered = Array.isArray(items) ? items : [];
       renderBufferedHistoryIfReady();
     });
 
     socket.on("chat:message", (msg) => {
-      // For real-time messages, render immediately.
-      // If user hasn't chosen name yet, render as not-mine.
-      const mine = myName && msg.name === myName;
-      addBubble(
-        `<div class="text-xs opacity-70">${escapeHtml(msg.name)} • ${escapeHtml(msg.time)}</div>
-         <div class="mt-1">${escapeHtml(msg.text)}</div>`,
-        mine
-      );
+      renderTextMessage(msg);
     });
 
     socket.on("chat:file", (m) => {
-      const mine = myName && m.name === myName;
-      const safeUrl = escapeHtml(m.url);
-      const safeFileName = escapeHtml(m.fileName);
-      const safeMime = escapeHtml(m.mimeType || "");
-
-      let preview = `<a class="underline" href="${safeUrl}" target="_blank">Download: ${safeFileName}</a>`;
-
-      if (safeMime.startsWith("image/")) {
-        preview = `<img src="${safeUrl}" class="mt-2 rounded-xl max-h-64" />`;
-      } else if (safeMime.startsWith("video/")) {
-        preview = `<video controls class="mt-2 rounded-xl max-h-64"><source src="${safeUrl}"></video>`;
-      } else if (safeMime.startsWith("audio/")) {
-        preview = `<audio controls class="mt-2 w-full"><source src="${safeUrl}"></audio>`;
-      }
-
-      addBubble(
-        `<div class="text-xs opacity-70">${escapeHtml(m.name)} • ${escapeHtml(m.time)}</div>
-         <div class="mt-1 text-sm">📎 ${safeFileName}</div>
-         ${preview}`,
-        mine
-      );
+      renderFileMessage(m);
     });
   </script>
 </body>
