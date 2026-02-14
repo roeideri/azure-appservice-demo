@@ -18,7 +18,7 @@
       <div class="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 p-5">
         <h2 class="text-lg font-semibold">Choose a name</h2>
         <p class="text-slate-400 text-sm mt-1">This name shows with your messages.</p>
-        <input id="nameInput" class="mt-4 w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 outline-none" placeholder="e.g. Roei" />
+        <input id="nameInput" class="mt-4 w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 outline-none" placeholder="e.g. Elias" />
         <button id="joinBtn" class="mt-3 w-full rounded-xl bg-slate-100 text-slate-900 font-semibold py-2">Join</button>
       </div>
     </div>
@@ -55,26 +55,82 @@
     const fileBtn = document.getElementById("fileBtn");
 
     let myName = "";
+    let historyBuffered = [];   // store history until user chooses name
+    let historyRendered = false;
 
     function nowISO() { return new Date().toISOString(); }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, m => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+      }[m]));
+    }
 
     function addBubble(html, mine=false) {
       const wrap = document.createElement("div");
       wrap.className = mine ? "flex justify-end" : "flex justify-start";
+
       const bubble = document.createElement("div");
       bubble.className = (mine
         ? "max-w-[80%] rounded-2xl bg-slate-100 text-slate-900 p-3"
         : "max-w-[80%] rounded-2xl bg-slate-800 text-slate-100 p-3 border border-slate-700");
+
       bubble.innerHTML = html;
       wrap.appendChild(bubble);
       messages.appendChild(wrap);
       messages.scrollTop = messages.scrollHeight;
     }
 
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, m => ({
-        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-      }[m]));
+    function renderTextMessage(msg) {
+      const mine = myName && msg.name === myName;
+      addBubble(
+        `<div class="text-xs opacity-70">${escapeHtml(msg.name)} • ${escapeHtml(msg.time)}</div>
+         <div class="mt-1">${escapeHtml(msg.text)}</div>`,
+        mine
+      );
+    }
+
+    function renderFileMessage(m) {
+      const mine = myName && m.name === myName;
+      const safeUrl = escapeHtml(m.url);
+      const safeFileName = escapeHtml(m.fileName);
+      const safeMime = escapeHtml(m.mimeType || "");
+
+      let preview = `<a class="underline" href="${safeUrl}" target="_blank">Download: ${safeFileName}</a>`;
+
+      if (safeMime.startsWith("image/")) {
+        preview = `<img src="${safeUrl}" class="mt-2 rounded-xl max-h-64" />`;
+      } else if (safeMime.startsWith("video/")) {
+        preview = `<video controls class="mt-2 rounded-xl max-h-64"><source src="${safeUrl}"></video>`;
+      } else if (safeMime.startsWith("audio/")) {
+        preview = `<audio controls class="mt-2 w-full"><source src="${safeUrl}"></audio>`;
+      }
+
+      addBubble(
+        `<div class="text-xs opacity-70">${escapeHtml(m.name)} • ${escapeHtml(m.time)}</div>
+         <div class="mt-1 text-sm">📎 ${safeFileName}</div>
+         ${preview}`,
+        mine
+      );
+    }
+
+    function renderBufferedHistoryIfReady() {
+      if (!myName || historyRendered) return;
+      if (historyBuffered.length === 0) {
+        historyRendered = true;
+        return;
+      }
+
+      // add a small divider
+      addBubble(`<div class="text-xs text-slate-600">— Last 24h history —</div>`, false);
+
+      for (const it of historyBuffered) {
+        if (it.kind === "text") renderTextMessage(it);
+        else if (it.kind === "file") renderFileMessage(it);
+      }
+
+      historyRendered = true;
+      historyBuffered = [];
     }
 
     joinBtn.onclick = () => {
@@ -83,12 +139,16 @@
       myName = n;
       nameModal.style.display = "none";
       addBubble(`<div class="text-sm text-slate-600">You joined as <b>${escapeHtml(myName)}</b></div>`, true);
+
+      // now that we have a name, we can render history and correctly mark "mine"
+      renderBufferedHistoryIfReady();
     };
 
     function sendText() {
       if (!myName) return;
       const t = text.value.trim();
       if (!t) return;
+
       const payload = { name: myName, text: t, time: nowISO() };
       socket.emit("chat:message", payload);
       text.value = "";
@@ -129,8 +189,18 @@
       fileInput.value = "";
     };
 
+    // --- incoming events ---
+    socket.on("chat:history", (items) => {
+      // items come sorted oldest->newest from server
+      // buffer until user chooses name so we can mark "mine" correctly
+      historyBuffered = Array.isArray(items) ? items : [];
+      renderBufferedHistoryIfReady();
+    });
+
     socket.on("chat:message", (msg) => {
-      const mine = msg.name === myName;
+      // For real-time messages, render immediately.
+      // If user hasn't chosen name yet, render as not-mine.
+      const mine = myName && msg.name === myName;
       addBubble(
         `<div class="text-xs opacity-70">${escapeHtml(msg.name)} • ${escapeHtml(msg.time)}</div>
          <div class="mt-1">${escapeHtml(msg.text)}</div>`,
@@ -139,7 +209,7 @@
     });
 
     socket.on("chat:file", (m) => {
-      const mine = m.name === myName;
+      const mine = myName && m.name === myName;
       const safeUrl = escapeHtml(m.url);
       const safeFileName = escapeHtml(m.fileName);
       const safeMime = escapeHtml(m.mimeType || "");
