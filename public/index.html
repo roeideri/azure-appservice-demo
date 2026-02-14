@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Mini Chat</title>
+</head>
+<body class="bg-slate-950 text-slate-100">
+  <div class="max-w-3xl mx-auto p-4 md:p-6">
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold">Mini Chat</h1>
+      <div class="text-xs text-slate-400">Real-time + media upload</div>
+    </div>
+
+    <!-- Name modal -->
+    <div id="nameModal" class="fixed inset-0 bg-black/60 flex items-center justify-center p-4">
+      <div class="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 p-5">
+        <h2 class="text-lg font-semibold">Choose a name</h2>
+        <p class="text-slate-400 text-sm mt-1">This name shows with your messages.</p>
+        <input id="nameInput" class="mt-4 w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 outline-none" placeholder="e.g. Roei" />
+        <button id="joinBtn" class="mt-3 w-full rounded-xl bg-slate-100 text-slate-900 font-semibold py-2">Join</button>
+      </div>
+    </div>
+
+    <!-- Chat area -->
+    <div class="mt-5 rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden">
+      <div id="messages" class="h-[55vh] overflow-y-auto p-4 space-y-3"></div>
+
+      <div class="border-t border-slate-800 p-3">
+        <div class="flex gap-2 items-center">
+          <input id="text" class="flex-1 rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 outline-none" placeholder="Type a message..." />
+          <input id="file" type="file" class="hidden" />
+          <button id="fileBtn" class="rounded-xl px-3 py-2 bg-slate-800 border border-slate-700">📎</button>
+          <button id="send" class="rounded-xl px-4 py-2 bg-slate-100 text-slate-900 font-semibold">Send</button>
+        </div>
+        <div class="text-xs text-slate-500 mt-2">Max file size: 10MB. Images/videos/audio will preview.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    const nameModal = document.getElementById("nameModal");
+    const nameInput = document.getElementById("nameInput");
+    const joinBtn = document.getElementById("joinBtn");
+
+    const messages = document.getElementById("messages");
+    const text = document.getElementById("text");
+    const send = document.getElementById("send");
+
+    const fileInput = document.getElementById("file");
+    const fileBtn = document.getElementById("fileBtn");
+
+    let myName = "";
+
+    function nowISO() { return new Date().toISOString(); }
+
+    function addBubble(html, mine=false) {
+      const wrap = document.createElement("div");
+      wrap.className = mine ? "flex justify-end" : "flex justify-start";
+      const bubble = document.createElement("div");
+      bubble.className = (mine
+        ? "max-w-[80%] rounded-2xl bg-slate-100 text-slate-900 p-3"
+        : "max-w-[80%] rounded-2xl bg-slate-800 text-slate-100 p-3 border border-slate-700");
+      bubble.innerHTML = html;
+      wrap.appendChild(bubble);
+      messages.appendChild(wrap);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, m => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+      }[m]));
+    }
+
+    joinBtn.onclick = () => {
+      const n = nameInput.value.trim();
+      if (!n) return;
+      myName = n;
+      nameModal.style.display = "none";
+      addBubble(`<div class="text-sm text-slate-600">You joined as <b>${escapeHtml(myName)}</b></div>`, true);
+    };
+
+    function sendText() {
+      if (!myName) return;
+      const t = text.value.trim();
+      if (!t) return;
+      const payload = { name: myName, text: t, time: nowISO() };
+      socket.emit("chat:message", payload);
+      text.value = "";
+    }
+
+    send.onclick = sendText;
+    text.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendText();
+    });
+
+    fileBtn.onclick = () => fileInput.click();
+
+    fileInput.onchange = async () => {
+      if (!myName) return;
+      const f = fileInput.files[0];
+      if (!f) return;
+
+      if (f.size > 10 * 1024 * 1024) {
+        addBubble(`<div class="text-sm"><b>File too big.</b> Max 10MB.</div>`, true);
+        fileInput.value = "";
+        return;
+      }
+
+      const buf = await f.arrayBuffer();
+
+      socket.emit("chat:file", {
+        name: myName,
+        time: nowISO(),
+        fileName: f.name,
+        mimeType: f.type,
+        data: Array.from(new Uint8Array(buf)) // send as byte array
+      }, (ack) => {
+        if (!ack || !ack.ok) {
+          addBubble(`<div class="text-sm"><b>Upload failed.</b></div>`, true);
+        }
+      });
+
+      fileInput.value = "";
+    };
+
+    socket.on("chat:message", (msg) => {
+      const mine = msg.name === myName;
+      addBubble(
+        `<div class="text-xs opacity-70">${escapeHtml(msg.name)} • ${escapeHtml(msg.time)}</div>
+         <div class="mt-1">${escapeHtml(msg.text)}</div>`,
+        mine
+      );
+    });
+
+    socket.on("chat:file", (m) => {
+      const mine = m.name === myName;
+      const safeUrl = escapeHtml(m.url);
+      const safeFileName = escapeHtml(m.fileName);
+      const safeMime = escapeHtml(m.mimeType || "");
+
+      let preview = `<a class="underline" href="${safeUrl}" target="_blank">Download: ${safeFileName}</a>`;
+
+      if (safeMime.startsWith("image/")) {
+        preview = `<img src="${safeUrl}" class="mt-2 rounded-xl max-h-64" />`;
+      } else if (safeMime.startsWith("video/")) {
+        preview = `<video controls class="mt-2 rounded-xl max-h-64"><source src="${safeUrl}"></video>`;
+      } else if (safeMime.startsWith("audio/")) {
+        preview = `<audio controls class="mt-2 w-full"><source src="${safeUrl}"></audio>`;
+      }
+
+      addBubble(
+        `<div class="text-xs opacity-70">${escapeHtml(m.name)} • ${escapeHtml(m.time)}</div>
+         <div class="mt-1 text-sm">📎 ${safeFileName}</div>
+         ${preview}`,
+        mine
+      );
+    });
+  </script>
+</body>
+</html>
